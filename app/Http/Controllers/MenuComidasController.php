@@ -21,7 +21,7 @@ class MenuComidasController extends Controller
             ->whereHas('vendedor', function ($q) {
                 $q->where('role_id', 2);
             })
-            ->with('vendedor:id,name,imagen')
+            ->with('vendedor:id,name,imagen,minimo_pedido')
             ->orderBy('categoria_id')
             ->get();
 
@@ -45,7 +45,7 @@ class MenuComidasController extends Controller
 
     public function store(Request $request)
     {
-        // 🔐 VALIDAR QUE SEA VENDEDOR
+    
         if (Auth::user()->rol_id != 2) { // 2 = vendedor
             abort(403, 'Solo los vendedores pueden agregar productos');
         }
@@ -72,7 +72,7 @@ class MenuComidasController extends Controller
         return redirect()->back()->with('success', 'Producto agregado');
     }
 
-    // 🔹 Productos del vendedor logueado
+    //  Productos del vendedor logueado
     public function misProductos()
     {
         $menu = MenuComidaModel::where('user_id', Auth::id())->get();

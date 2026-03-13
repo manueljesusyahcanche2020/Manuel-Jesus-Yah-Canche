@@ -3,7 +3,8 @@
 use Illuminate\Support\Facades\Facade;
 
 return [
-
+    //comfiguracion de ora mexico 
+    'timezone' => env('APP_TIMEZONE', 'America/Mexico_City'),
     /*
     |--------------------------------------------------------------------------
     | Application Name

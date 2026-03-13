@@ -8,89 +8,92 @@ use App\Models\Carrito;
 use Illuminate\Http\Request;
 use App\Models\CarritoItem;
 
-
+use App\Models\Pedido;
+use App\Models\PedidoItem;
 use App\Models\MenuComidaModel;
 
 class CarritoController extends Controller
 {
-
-
     public function listar()
     {
-        $rows = DB::select(
-            "SELECT
-                ci.id AS item_id,
-                ci.cantidad,
-                ci.precio,
-                ci.subtotal,
-                m.id AS producto_id,
-                m.nombre AS producto_nombre,
-                u.name AS vendedor_nombre,
-                IFNULL(u.imagen, 'default.png') AS vendedor_icono
-            FROM carritos c
-            JOIN carrito_items ci ON ci.carrito_id = c.id
-            JOIN menu_comidas m ON m.id = ci.menu_comida_id
-            JOIN users u ON u.id = m.user_id
-            WHERE c.user_id = ?
-            AND c.estado = 0",
-            [Auth::id()]
-        );
+        // Obtenemos los carritos activos del usuario
+        $carritos = DB::table('carritos as c')
+            ->join('users as u', 'u.id', '=', 'c.vendedor_id')
+            ->where('c.user_id', Auth::id())
+            ->where('c.estado', 0)
+            ->select('c.id as carrito_id', 'c.total', 'u.name as vendedor_nombre', DB::raw("IFNULL(u.imagen, 'default.png') as vendedor_icono"))
+            ->get();
 
-        if (empty($rows)) {
+        if ($carritos->isEmpty()) {
             return response()->json([
-                'items' => [],
-                'total' => 0
+                'carritos' => [],
             ]);
         }
 
-        $items = [];
-        $total = 0;
+        $resultado = [];
 
-        foreach ($rows as $row) {
-            $items[] = [
-                'id' => $row->item_id,
-                'cantidad' => $row->cantidad,
-                'precio' => $row->precio,
-                'subtotal' => $row->subtotal,
-                'producto' => [
-                    'id' => $row->producto_id,
-                    'nombre' => $row->producto_nombre
-                ],
+        foreach ($carritos as $carrito) {
+            // Obtenemos los items de este carrito
+            $items = DB::table('carrito_items as ci')
+                ->join('menu_comidas as m', 'm.id', '=', 'ci.menu_comida_id')
+                ->where('ci.carrito_id', $carrito->carrito_id)
+                ->select('ci.id as item_id', 'ci.cantidad', 'ci.precio', 'ci.subtotal', 'm.id as producto_id', 'm.nombre as producto_nombre')
+                ->get();
+
+            $itemsArray = $items->map(function ($item) {
+                return [
+                    'id' => $item->item_id,
+                    'cantidad' => $item->cantidad,
+                    'precio' => $item->precio,
+                    'subtotal' => $item->subtotal,
+                    'producto' => [
+                        'id' => $item->producto_id,
+                        'nombre' => $item->producto_nombre,
+                    ],
+                ];
+            })->toArray();
+
+            $resultado[] = [
+                'id' => $carrito->carrito_id,
+                'total' => $carrito->total,
                 'vendedor' => [
-                    'nombre' => $row->vendedor_nombre,
-                    'icono' => $row->vendedor_icono
-                ]
+                    'nombre' => $carrito->vendedor_nombre,
+                    'icono' => $carrito->vendedor_icono,
+                ],
+                'items' => $itemsArray,
             ];
-            $total += $row->subtotal;
         }
 
-        return response()->json([
-            'items' => $items,
-            'total' => $total
-        ]);
+        return response()->json(['carritos' => $resultado]);
     }
 
-    // Ver carrito
     public function index()
     {
-        $carrito = Carrito::with('items.menu')
+        $carritos = Carrito::with(['items.menu', 'vendedor']) // trae items y datos del vendedor
             ->where('user_id', Auth::id())
-            ->where('estado', 0)
-            ->first();
+            ->where('estado', 0) // carrito activo
+            ->get(); // <- traemos todos los carritos
 
-        return view('dashboard.cliente.carrito', compact('carrito'));
+        return view('dashboard.cliente.carrito', compact('carritos'));
     }
 
     // Agregar producto al carrito
     public function agregar($menuId)
     {
         $menu = MenuComidaModel::findOrFail($menuId);
+        $vendedorId = $menu->user_id;
 
+        // Buscar carrito activo para el usuario y el vendedor
         $carrito = Carrito::firstOrCreate(
-            ['user_id' => Auth::id(), 'estado' => 0],
+            [
+                'user_id' => Auth::id(),
+                'vendedor_id' => $vendedorId,
+                'estado' => 0
+            ],
             ['total' => 0]
         );
 
+        // Buscar item existente
         $item = CarritoItem::where('carrito_id', $carrito->id)
             ->where('menu_comida_id', $menu->id)
             ->first();
@@ -108,26 +111,13 @@ class CarritoController extends Controller
         $item->subtotal = $item->cantidad * $item->precio;
         $carrito->items()->save($item);
 
+        // Actualizar total del carrito
         $carrito->total = $carrito->items->sum('subtotal');
         $carrito->save();
 
         return back()->with('success', 'Producto agregado al carrito');
     }
 
-    /*/ Eliminar item
-    public function eliminar($id)
-    {
-        $item = CarritoItem::findOrFail($id);
-        $carrito = $item->carrito;
-
-        $item->delete();
-
-        $carrito->total = $carrito->items()->sum('subtotal');
-        $carrito->save();
-
-        return back();
-    }*/
-    
     public function actualizar(Request $request)
     {
         $request->validate([
@@ -135,34 +125,73 @@ class CarritoController extends Controller
             'cantidad' => 'required|integer|min:1'
         ]);
 
-        // 🔁 Ejecutar el PROCEDURE (NO devuelve datos)
         DB::statement(
-            'CALL actualizar_item_carrito(?, ?, ?)',
+            'SELECT actualizar_item_carrito(?, ?)',
             [
                 $request->id,
-                Auth::id(),
                 $request->cantidad
             ]
         );
 
-        // ✅ Reutilizar el método listar()
         return $this->listar();
     }
+
     public function eliminar($id)
     {
         $item = CarritoItem::with('carrito')
             ->where('id', $id)
             ->firstOrFail();
 
-        // 🔐 Seguridad
         if ($item->carrito->user_id !== Auth::id()) {
             abort(403, 'No autorizado');
         }
 
         $item->delete();
 
-        // 🔁 devolver carrito actualizado
         return $this->listar();
     }
+    public function confirmarCompra(Request $request)
+    {
+        // Validamos que la dirección exista
+        $request->validate([
+            'direccion_id' => 'required|exists:direcciones,id',
+            'carrito_id'  => 'required|exists:carritos,id', // validar que se envíe un carrito
+        ]);
 
+        // Validamos que el carrito pertenezca al usuario
+        $carrito = DB::table('carritos')
+                    ->where('id', $request->carrito_id)
+                    ->where('user_id', Auth::id())
+                    ->first();
+
+        if (!$carrito) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'El carrito no existe o no te pertenece'
+            ], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Llamamos al procedimiento solo para este carrito
+            DB::statement('CALL confirmar_compra(?, ?, ?)', [
+                Auth::id(),
+                $request->direccion_id,
+                $request->carrito_id
+            ]);
+
+            DB::commit();
+            return response()->json([
+                'success' => true,
+                'message' => 'Compra confirmada con éxito'
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

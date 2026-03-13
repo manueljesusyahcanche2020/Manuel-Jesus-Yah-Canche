@@ -55,6 +55,14 @@ $(document).ready(function () {
                 ? `/storage/${c.vendedor.imagen}`
                 : `/img/default.png`;
 
+            // Aviso si es categoría "Comida"
+            let avisoComida = '';
+            if (c.categoria && c.categoria.nombre === 'Comida') {
+                avisoComida = `<p style="color:red; font-size:0.9rem;">
+                    ⚠️ Este producto de tipo comida no se puede devolver una vez enviado.
+                </p>`;
+            }
+
             const card = `
                 <div class="col-md-4 mb-4">
                     <div class="card h-100 shadow-sm">
@@ -68,15 +76,25 @@ $(document).ready(function () {
                             <h5 class="card-title">${c.nombre}</h5>
                             <p class="card-text text-muted">${c.descripcion ?? ''}</p>
 
-                            <!-- VENDEDOR -->
+                            <!-- Aviso Comida -->
+                            ${avisoComida}
+
+                            <!-- Vendedor -->
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <img src="${imagenVendedor}"
                                      width="32"
                                      height="32"
                                      class="rounded-circle border">
-                                <small class="text-muted">
-                                    Vendedor: ${c.vendedor?.name ?? 'Desconocido'}
-                                </small>
+
+                                <div>
+                                    <small class="text-muted">
+                                        Vendedor: ${c.vendedor?.name ?? 'Desconocido'}
+                                    </small><br>
+
+                                    <small class="text-danger">
+                                        Pedido mínimo: $${parseFloat(c.vendedor?.minimo_pedido ?? 0).toFixed(2)}
+                                    </small>
+                                </div>
                             </div>
 
                             <h6 class="text-success">
@@ -105,9 +123,7 @@ $(document).ready(function () {
             dataType: 'json',
             success: renderizarComidas,
             error: () => {
-                contenedor.html(
-                    '<p class="text-center text-danger">Error al cargar el menú.</p>'
-                );
+                contenedor.html('<p class="text-center text-danger">Error al cargar el menú.</p>');
             }
         });
     }
@@ -123,6 +139,7 @@ $(document).ready(function () {
         $.getJSON(url, renderizarComidas);
     });
 
+    // Agregar al carrito
     contenedor.on('click', '.agregar-carrito', function () {
         const id = $(this).data('id');
 
@@ -135,8 +152,6 @@ $(document).ready(function () {
                 console.error(err);
             });
     });
-
-
 
     // Inicializar
     cargarComidas();

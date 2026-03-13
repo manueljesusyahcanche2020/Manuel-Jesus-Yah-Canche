@@ -15,14 +15,14 @@ class CarritoItem extends Model
         'subtotal'
     ];
 
-    public function carrito()
-    {
-        return $this->belongsTo(Carrito::class);
-    }
 
     public function menu()
     {
         return $this->belongsTo(MenuComidaModel::class, 'menu_comida_id');
+    }
+    public function carrito()
+    {
+        return $this->belongsTo(Carrito::class, 'carrito_id');
     }
 }
 

@@ -37,6 +37,23 @@ class User extends Authenticatable
         return $this->hasMany(MenuComidaModel::class, 'user_id'); 
         // 'user_id' es la columna en menu_comidas que indica a qué usuario pertenece
     }
+// 🔹 Pedidos que hizo como cliente
+    public function pedidos()
+    {
+        return $this->hasMany(Pedido::class);
+    }
 
-
+    // 🔹 Ventas como vendedor
+    public function ventas()
+    {
+        return $this->hasMany(PedidoItem::class, 'vendor_id');
+    }
+    public function pagoVendedor()
+    {
+        return $this->hasOne(VendedorPago::class,'user_id');
+    }
+    public function direcciones()
+    {
+        return $this->hasMany(\App\Models\Direccion::class);
+    }
 }

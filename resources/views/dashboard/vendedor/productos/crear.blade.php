@@ -2,47 +2,173 @@
 
 @section('contenido')
 
-<div class="container mt-4">
+{{-- ================= MENSAJES DEL SISTEMA ================= --}}
+
+{{-- 🟢 Éxito --}}
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+        <strong>✔ Éxito:</strong> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
+{{-- 🔴 Error del procedure --}}
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+        <strong>✖ Error:</strong> {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
+{{-- 🟡 Errores de validación Laravel --}}
+@if ($errors->any())
+    <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+        <strong>⚠ Atención:</strong>
+        <ul class="mb-0 mt-2">
+            @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+<style>
+    /* Scroll solo en desktop */
+@media (min-width: 992px) {
+    .productos-scroll {
+        height: calc(100vh - 140px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 12px;
+    }
+}
+
+/* En móvil no usamos scroll interno */
+@media (max-width: 991px) {
+    .productos-scroll {
+        height: auto;
+        overflow: visible;
+    }
+}
+</style>
+<div class="container-fluid mt-4">
     <div class="row">
 
-        <!-- PERFIL + PRODUCTOS -->
-        <div class="col-md-6 order-md-2">
+        <!-- PERFIL -->
+        <div class="col-12 col-md-4 col-lg-3 mb-4">
+            <div class="card shadow-sm h-100 position-lg-sticky" style="top:20px;">
+                <div class="card-body text-center">
 
-            <!-- PERFIL -->
-            <div class="card mb-4 shadow-sm">
-                <div class="card-body d-flex align-items-center gap-3">
                     <img
                         src="{{ Auth::user()->imagen ? asset('storage/' . Auth::user()->imagen) : asset('img/user-default.png') }}"
-                        class="rounded-circle"
-                        width="70"
-                        height="70"
+                        class="rounded-circle mb-3 border border-3 border-warning"
+                        width="110"
+                        height="110"
                         style="object-fit:cover"
                     >
-                    <div>
-                        <h5 class="mb-0">{{ Auth::user()->name }}</h5>
-                        <small class="text-muted">{{ Auth::user()->role->nombre ?? 'Sin rol' }}</small>
-                    </div>
+
+                    <h5 class="fw-bold mb-0">{{ Auth::user()->name }}</h5>
+                    <small class="text-muted d-block mb-3">
+                        {{ Auth::user()->role->nombre ?? 'Sin rol' }}
+                    </small>
+
+                    @if(Auth::user()->role->nombre === 'Vendedor')
+                        <button class="btn btn-warning w-100 fw-bold"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modalAgregarProducto">
+                            ➕ Agregar Producto
+                        </button>
+                    @endif
+
                 </div>
             </div>
-
-            <!-- PRODUCTOS -->
-            <div class="card shadow-sm">
-                <div class="card-body" id="productos-list">
-                    <small>Cargando productos...</small>
-                </div>
-            </div>
-
         </div>
 
-        <!-- BOTÓN AGREGAR -->
-        <div class="col-md-6 order-md-1">
-            @if(Auth::user()->role->nombre === 'Vendedor')
-            <div class="d-flex justify-content-center mb-3">
-                <button class="btn btn-warning w-75" data-bs-toggle="modal" data-bs-target="#modalAgregarProducto">
-                    Agregar Producto
-                </button>
+        <!-- PRODUCTOS -->
+        <div class="col-12 col-md-8 col-lg-9">
+
+            <!-- Scroll solo en pantallas grandes -->
+            <div class="productos-scroll">
+
+                <div class="row g-4">
+                    @forelse($productos as $producto)
+
+                        <div class="col-12 col-sm-6 col-xl-4">
+                            <div class="card h-100 shadow-sm border-0">
+
+                                @if($producto->imagen)
+                                    <img src="{{ asset('storage/'.$producto->imagen) }}"
+                                         class="card-img-top"
+                                         style="height:200px;object-fit:cover;">
+                                @endif
+
+                                <div class="card-body d-flex flex-column">
+
+                                    <h5 class="fw-bold">{{ $producto->nombre }}</h5>
+
+                                    <p class="small text-muted">
+                                        {{ $producto->descripcion }}
+                                    </p>
+
+                                    <p class="fw-bold text-warning fs-5">
+                                        ${{ number_format($producto->precio,2) }}
+                                    </p>
+
+                                    <p class="small">
+                                        @if($producto->sin_stock)
+                                            <span class="badge bg-danger">
+                                                Hasta agotar existencia
+                                            </span>
+                                        @else
+                                            <span class="badge bg-success">
+                                                Stock: {{ $producto->stock }}
+                                            </span>
+                                        @endif
+                                    </p>
+
+                                    <div class="mt-auto d-flex justify-content-between">
+
+                                        <!-- EDITAR -->
+                                        <button class="btn btn-sm btn-outline-primary btn-editar"
+                                            data-id="{{ $producto->id }}"
+                                            data-nombre="{{ $producto->nombre }}"
+                                            data-descripcion="{{ $producto->descripcion }}"
+                                            data-precio="{{ $producto->precio }}"
+                                            data-categoria="{{ $producto->categoria_id }}"
+                                            data-stock="{{ $producto->stock }}"
+                                            data-sin_stock="{{ $producto->sin_stock }}"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalEditarProducto">
+                                            ✏️ Editar
+                                        </button>
+
+                                        <!-- ELIMINAR -->
+                                        <form method="POST"
+                                            action="{{ route('vendedor.productos.destroy', $producto->id) }}"
+                                            onsubmit="return confirm('¿Eliminar producto?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger">
+                                                🗑️
+                                            </button>
+                                        </form>
+
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                    @empty
+                        <div class="col-12">
+                            <div class="alert alert-secondary text-center">
+                                No hay productos registrados.
+                            </div>
+                        </div>
+                    @endforelse
+                </div>
+
             </div>
-            @endif
         </div>
 
     </div>
@@ -52,30 +178,55 @@
 <div class="modal fade" id="modalAgregarProducto" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="form-agregar-producto" enctype="multipart/form-data">
+
+            <form method="POST"
+                  action="{{ route('vendedor.productos.store') }}"
+                  enctype="multipart/form-data">
                 @csrf
+
                 <div class="modal-header">
                     <h5 class="modal-title">Agregar Producto</h5>
                     <button class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
 
                 <div class="modal-body">
+
                     <input class="form-control mb-2" name="nombre" placeholder="Nombre" required>
+
                     <textarea class="form-control mb-2" name="descripcion" placeholder="Descripción"></textarea>
 
-                    <select class="form-control mb-2" name="categoria_id" id="categoria_id" required>
-                        <option value="">Cargando categorías...</option>
+                    <select class="form-control mb-2" name="categoria_id" required>
+                        <option value="">Seleccione categoría</option>
+                        @foreach($categorias as $categoria)
+                            <option value="{{ $categoria->id }}">
+                                {{ $categoria->nombre }}
+                            </option>
+                        @endforeach
                     </select>
 
                     <input class="form-control mb-2" type="number" step="0.01" name="precio" placeholder="Precio" required>
+
+                    <!-- STOCK -->
+                    <input class="form-control mb-2" type="number" name="stock" placeholder="Cantidad en stock">
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="sin_stock" value="1" id="sinStockCheck">
+                        <label class="form-check-label" for="sinStockCheck">
+                            No hay stock (hasta agotar existencia)
+                        </label>
+                    </div>
+
                     <input class="form-control mb-2" type="file" name="imagen" required>
+
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button class="btn btn-warning">Guardar</button>
                 </div>
+
             </form>
+
         </div>
     </div>
 </div>
@@ -84,11 +235,10 @@
 <div class="modal fade" id="modalEditarProducto" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form id="form-editar-producto" enctype="multipart/form-data">
+
+            <form method="POST" id="formEditarProducto" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
-
-                <input type="hidden" id="edit-id">
 
                 <div class="modal-header">
                     <h5 class="modal-title">Editar Producto</h5>
@@ -96,151 +246,125 @@
                 </div>
 
                 <div class="modal-body">
+
                     <input class="form-control mb-2" id="edit-nombre" name="nombre" required>
                     <textarea class="form-control mb-2" id="edit-descripcion" name="descripcion"></textarea>
 
-                    <select class="form-control mb-2" id="edit-categoria_id" name="categoria_id" required>
-                        <option value="">Cargando categorías...</option>
+                    <select class="form-control mb-2" id="edit-categoria" name="categoria_id" required>
+                        @foreach($categorias as $categoria)
+                            <option value="{{ $categoria->id }}">
+                                {{ $categoria->nombre }}
+                            </option>
+                        @endforeach
                     </select>
 
                     <input class="form-control mb-2" type="number" step="0.01" id="edit-precio" name="precio" required>
+
+                    <!-- STOCK -->
+                    <input class="form-control mb-2" type="number" id="edit-stock" name="stock">
+
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="edit-sin-stock" name="sin_stock" value="1">
+                        <label class="form-check-label">
+                            No hay stock (hasta agotar existencia)
+                        </label>
+                    </div>
+
                     <input class="form-control mb-2" type="file" name="imagen">
                     <small class="text-muted">Opcional</small>
+
                 </div>
 
                 <div class="modal-footer">
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button class="btn btn-primary">Actualizar</button>
                 </div>
+
             </form>
+
         </div>
     </div>
 </div>
 
-<!-- ================= JS ================= -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-$(document).ready(function () {
+document.addEventListener("DOMContentLoaded", function() {
 
-    /* ================= CATEGORÍAS ================= */
-    function cargarCategorias(selectId, selected = null) {
-        $.get("{{ route('ajax.categorias') }}", function (categorias) {
-            let options = '<option value="">Seleccione una categoría</option>';
+    document.querySelectorAll('.btn-editar').forEach(button => {
 
-            categorias.forEach(cat => {
-                options += `
-                    <option value="${cat.id}" ${selected == cat.id ? 'selected' : ''}>
-                        ${cat.nombre}
-                    </option>
-                `;
-            });
+        button.addEventListener('click', function() {
 
-            $(selectId).html(options);
+            let id = this.dataset.id;
+
+            document.getElementById('edit-nombre').value = this.dataset.nombre;
+            document.getElementById('edit-descripcion').value = this.dataset.descripcion;
+            document.getElementById('edit-precio').value = this.dataset.precio;
+            document.getElementById('edit-categoria').value = this.dataset.categoria;
+            document.getElementById('edit-stock').value = this.dataset.stock;
+
+            document.getElementById('edit-sin-stock').checked =
+                this.dataset.sin_stock == 1 ? true : false;
+
+            document.getElementById('formEditarProducto')
+                .action = "/vendedor/productos/" + id;
+
         });
-    }
 
-    $('#modalAgregarProducto').on('shown.bs.modal', function () {
-        cargarCategorias('#categoria_id');
     });
 
-    /* ================= MENÚS ================= */
-    function cargarMenus() {
-        $.get("{{ route('vendedor.menu.ajax') }}", function (data) {
-            let html = '<ul class="list-group">';
-
-            if (!data.length) {
-                html += '<li class="list-group-item text-muted">No hay productos</li>';
-            } else {
-                data.forEach(menu => {
-                    html += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <div class="d-flex align-items-center">
-                                ${menu.imagen ? `<img src="/storage/${menu.imagen}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;margin-right:10px;">` : ''}
-                                <span>${menu.nombre} - $${menu.precio}</span>
-                            </div>
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-primary btn-editar"
-                                    data-id="${menu.id}"
-                                    data-nombre="${menu.nombre}"
-                                    data-descripcion="${menu.descripcion ?? ''}"
-                                    data-categoria_id="${menu.categoria_id}"
-                                    data-precio="${menu.precio}">✏️</button>
-                                <button class="btn btn-sm btn-danger btn-eliminar"
-                                    data-id="${menu.id}">🗑️</button>
-                            </div>
-                        </li>`;
-                });
-            }
-
-            html += '</ul>';
-            $('#productos-list').html(html);
-        });
-    }
-
-    cargarMenus();
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
 
     /* ================= AGREGAR ================= */
-    $('#form-agregar-producto').submit(function(e){
-        e.preventDefault();
+    const stockInput = document.querySelector('#modalAgregarProducto input[name="stock"]');
+    const sinStockCheck = document.getElementById('sinStockCheck');
 
-        $.ajax({
-            url: "{{ route('vendedor.productos.store') }}",
-            method: 'POST',
-            data: new FormData(this),
-            contentType: false,
-            processData: false,
-            success() {
-                $('#modalAgregarProducto').modal('hide');
-                $('#form-agregar-producto')[0].reset();
-                cargarMenus();
+    if (stockInput && sinStockCheck) {
+
+        stockInput.addEventListener('input', function() {
+            if (this.value.trim() !== '') {
+                sinStockCheck.checked = false;
+                sinStockCheck.setAttribute('disabled', true);
+            } else {
+                sinStockCheck.removeAttribute('disabled');
             }
         });
-    });
+
+        sinStockCheck.addEventListener('change', function() {
+            if (this.checked) {
+                stockInput.value = '';
+                stockInput.setAttribute('disabled', true);
+            } else {
+                stockInput.removeAttribute('disabled');
+            }
+        });
+    }
 
     /* ================= EDITAR ================= */
-    $(document).on('click','.btn-editar',function(){
-        let categoriaId = $(this).data('categoria_id');
+    const editStockInput = document.getElementById('edit-stock');
+    const editSinStockCheck = document.getElementById('edit-sin-stock');
 
-        $('#edit-id').val($(this).data('id'));
-        $('#edit-nombre').val($(this).data('nombre'));
-        $('#edit-descripcion').val($(this).data('descripcion'));
-        $('#edit-precio').val($(this).data('precio'));
+    if (editStockInput && editSinStockCheck) {
 
-        cargarCategorias('#edit-categoria_id', categoriaId);
-
-        $('#modalEditarProducto').modal('show');
-    });
-
-    $('#form-editar-producto').submit(function(e){
-        e.preventDefault();
-        let id = $('#edit-id').val();
-
-        $.ajax({
-            url: `/vendedor/productos/${id}`,
-            method: 'POST',
-            data: new FormData(this),
-            contentType: false,
-            processData: false,
-            success() {
-                $('#modalEditarProducto').modal('hide');
-                cargarMenus();
+        editStockInput.addEventListener('input', function() {
+            if (this.value.trim() !== '') {
+                editSinStockCheck.checked = false;
+                editSinStockCheck.setAttribute('disabled', true);
+            } else {
+                editSinStockCheck.removeAttribute('disabled');
             }
         });
-    });
 
-    /* ================= ELIMINAR ================= */
-    $(document).on('click','.btn-eliminar',function(){
-        if(!confirm('¿Eliminar producto?')) return;
-
-        $.ajax({
-            url: `/vendedor/productos/${$(this).data('id')}`,
-            method: 'DELETE',
-            data: {_token:'{{ csrf_token() }}'},
-            success(){ cargarMenus(); }
+        editSinStockCheck.addEventListener('change', function() {
+            if (this.checked) {
+                editStockInput.value = '';
+                editStockInput.setAttribute('disabled', true);
+            } else {
+                editStockInput.removeAttribute('disabled');
+            }
         });
-    });
+    }
 
 });
 </script>

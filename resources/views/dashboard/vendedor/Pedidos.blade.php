@@ -1,165 +1,227 @@
 @extends('dashboard.welcome')
 
 @section('contenido')
-<div class="container-fluid">
 
-    <h4 class="mb-4 d-flex align-items-center gap-2" style="color:#ff9900;">
-        <i class="fa-solid fa-clipboard-list"></i> Pedidos
-    </h4>
+@if(session('success'))
+<div class="alert alert-success alert-dismissible fade show">
+    {{ session('success') }}
+    <button class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
 
-    <!-- ====== TABLA DE PEDIDOS ====== -->
-    <div class="card shadow-sm border-0 rounded-4 p-3">
+@if(session('error'))
+<div class="alert alert-danger alert-dismissible fade show">
+    {{ session('error') }}
+    <button class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+@endif
 
-        <h6 class="fw-bold mb-3">Listado de Pedidos</h6>
+<div class="container-fluid py-4">
 
-        <div class="table-responsive">
-            <table id="tablaPedidos" class="table table-striped align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th># Pedido</th>
-                        <th>Comprador</th>
-                        <th>Productos</th>
-                        <th>Total</th>
-                        <th>Estado</th>
-                        <th>Fecha</th>
-                        <th>Acción</th>
-                    </tr>
-                </thead>
-                <tbody>
+<h4 class="mb-4 fw-bold d-flex align-items-center gap-2" style="color:#ff9900;">
+<i class="fa-solid fa-clipboard-list"></i> Pedidos Recibidos
+</h4>
 
-                    <!-- PEDIDO 1 -->
-                    <tr>
-                        <td>101</td>
-                        <td>
-                            <strong>Juan Pérez</strong><br>
-                            <small class="text-muted">juan@gmail.com</small>
-                        </td>
-                        <td>
-                            <ul class="mb-0 ps-3">
-                                <li>2 × Taco al Pastor</li>
-                                <li>1 × Hamburguesa</li>
-                            </ul>
-                        </td>
-                        <td>$320.00</td>
-                        <td>
-                            <span class="badge bg-secondary">Pendiente</span>
-                        </td>
-                        <td>18/12/2025</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary btn-estado"
-                                    data-id="101"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#modalEstado">
-                                <i class="fa fa-pen"></i>
-                            </button>
-                        </td>
-                    </tr>
+<div class="card border-0 shadow-lg rounded-4 p-4">
 
-                    <!-- PEDIDO 2 -->
-                    <tr>
-                        <td>102</td>
-                        <td>
-                            <strong>Ana López</strong><br>
-                            <small class="text-muted">ana@gmail.com</small>
-                        </td>
-                        <td>
-                            <ul class="mb-0 ps-3">
-                                <li>3 × Papas a la francesa</li>
-                            </ul>
-                        </td>
-                        <td>$99.00</td>
-                        <td>
-                            <span class="badge bg-warning text-dark">En preparación</span>
-                        </td>
-                        <td>17/12/2025</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary btn-estado"
-                                    data-id="102"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#modalEstado">
-                                <i class="fa fa-pen"></i>
-                            </button>
-                        </td>
-                    </tr>
+<h6 class="fw-bold mb-3 border-bottom pb-2">
+Listado de Pedidos
+</h6>
 
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div class="table-responsive">
+
+<table id="tablaPedidos" class="table table-hover align-middle">
+
+<thead class="table-dark">
+<tr>
+<th>#</th>
+<th>Cliente</th>
+<th>Producto</th>
+<th>Categoría</th>
+<th>Cant.</th>
+<th>Subtotal</th>
+<th>Estado</th>
+<th>Fecha</th>
+<th>Acciones</th>
+</tr>
+</thead>
+
+<tbody>
+
+@foreach($pedidos as $pedidoId => $itemsPedido)
+
+@php
+$cliente = $itemsPedido->first()->cliente ?? 'Usuario eliminado';
+$estadoPedido = $itemsPedido->first()->estado ?? 'pendiente';
+
+$estadoColor = [
+'pendiente' => 'secondary',
+'enviado' => 'info',
+'entregado' => 'success',
+'cancelado' => 'danger'
+];
+@endphp
+
+@foreach($itemsPedido as $item)
+
+<tr>
+
+<td class="fw-semibold">
+#{{ $pedidoId }}
+</td>
+
+<td>
+{{ $cliente }}
+</td>
+
+<td>
+{{ $item->producto }}
+</td>
+
+<td>
+{{ $item->categoria ?? '-' }}
+</td>
+
+<td>
+{{ $item->cantidad }}
+</td>
+
+<td class="fw-semibold">
+${{ number_format($item->subtotal,2) }}
+</td>
+
+<td>
+<span class="badge bg-{{ $estadoColor[$estadoPedido] ?? 'secondary' }}">
+{{ ucfirst($estadoPedido) }}
+</span>
+</td>
+
+<td>
+{{ \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') }}
+</td>
+
+<td>
+
+<div class="d-flex gap-2">
+
+<a href="{{ route('vendedor.factura',$pedidoId) }}"
+class="btn btn-sm btn-primary rounded-pill">
+<i class="fa-solid fa-file-invoice"></i>
+</a>
+
+<button class="btn btn-sm btn-warning rounded-pill"
+data-bs-toggle="modal"
+data-bs-target="#modalEstado{{ $pedidoId }}">
+<i class="fa-solid fa-truck-fast"></i>
+</button>
+
 </div>
 
-<!-- ===== MODAL ESTADO ===== -->
-<div class="modal fade" id="modalEstado" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4">
+</td>
 
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="fa-solid fa-truck-fast text-warning"></i>
-                    Cambiar estado del pedido
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
+</tr>
 
-            <div class="modal-body">
-                <input type="hidden" id="pedidoId">
+@endforeach
 
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Estado</label>
-                    <select id="nuevoEstado" class="form-select">
-                        <option value="preparacion">🟡 En preparación</option>
-                        <option value="reparto">🚚 En reparto</option>
-                    </select>
-                </div>
-            </div>
+{{-- MODAL POR PEDIDO --}}
 
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">
-                    Cancelar
-                </button>
-                <button class="btn btn-warning" id="guardarEstado">
-                    Guardar estado
-                </button>
-            </div>
+<div class="modal fade" id="modalEstado{{ $pedidoId }}" tabindex="-1">
 
-        </div>
-    </div>
+<div class="modal-dialog modal-dialog-centered">
+
+<div class="modal-content rounded-4 shadow">
+
+<form method="POST" action="{{ route('vendedor.cambiarEstado') }}">
+
+@csrf
+
+<input type="hidden" name="pedido_id" value="{{ $pedidoId }}">
+
+<div class="modal-header">
+
+<h5 class="modal-title fw-bold">
+<i class="fa-solid fa-truck-fast text-warning"></i>
+Cambiar estado del pedido
+</h5>
+
+<button class="btn-close" data-bs-dismiss="modal"></button>
+
 </div>
 
-{{-- ====== DATATABLE ====== --}}
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+<div class="modal-body">
+
+<label class="form-label fw-semibold">
+Seleccionar estado
+</label>
+
+<select name="estado" class="form-select rounded-3" required>
+
+<option value="pendiente">🟡 Pendiente</option>
+<option value="enviado">🚚 Enviado</option>
+<option value="entregado">✅ Entregado</option>
+<option value="cancelado">❌ Cancelado</option>
+
+</select>
+
+</div>
+
+<div class="modal-footer">
+
+<button class="btn btn-secondary rounded-pill"
+data-bs-dismiss="modal">
+Cancelar
+</button>
+
+<button type="submit"
+class="btn btn-warning rounded-pill">
+Guardar cambios
+</button>
+
+</div>
+
+</form>
+
+</div>
+</div>
+</div>
+
+@endforeach
+
+</tbody>
+
+</table>
+
+</div>
+</div>
+
+</div>
+
+
+{{-- DATATABLE --}}
+
+<link rel="stylesheet"
+href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+
 <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
-let filaActual = null;
 
-$(document).ready(function () {
-    $('#tablaPedidos').DataTable({
-        language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
-        },
-        pageLength: 10
-    });
+$(document).ready(function(){
+
+$('#tablaPedidos').DataTable({
+
+language:{
+url:'//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+},
+
+pageLength:10
+
 });
 
-$(document).on('click', '.btn-estado', function () {
-    filaActual = $(this).closest('tr');
-    $('#pedidoId').val($(this).data('id'));
 });
 
-$('#guardarEstado').on('click', function () {
-    const estado = $('#nuevoEstado').val();
-    let badge = '';
-
-    if (estado === 'preparacion') {
-        badge = '<span class="badge bg-warning text-dark">En preparación</span>';
-    } else {
-        badge = '<span class="badge bg-info text-dark">En reparto</span>';
-    }
-
-    filaActual.find('td:eq(4)').html(badge);
-    $('#modalEstado').modal('hide');
-});
 </script>
+
 @endsection

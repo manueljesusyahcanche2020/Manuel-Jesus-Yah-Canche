@@ -64,29 +64,68 @@ class AuthController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
+            'telefono' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:6|confirmed',
-            'imagen' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'imagen' => 'nullable|url|max:2048',
         ]);
 
         $user->name = $request->name;
         $user->email = $request->email;
+        $user->telefono = $request->telefono; //  guardar teléfono
 
         if ($request->filled('password')) {
             $user->password = Hash::make($request->password);
         }
 
-        if ($request->hasFile('imagen')) {
-
-            if ($user->imagen && Storage::disk('public')->exists($user->imagen)) {
-                Storage::disk('public')->delete($user->imagen);
-            }
-
-            $ruta = $request->file('imagen')->store('users', 'public');
-            $user->imagen = $ruta;
+        if ($request->filled('imagen')) {
+            $user->imagen = $request->imagen;
         }
 
         $user->save();
 
         return back()->with('success', 'Perfil actualizado correctamente');
     }
+    public function updateFoto(Request $request)
+    {
+        $request->validate([
+            'imagen' => 'required|image|mimes:jpg,jpeg,png|max:2048'
+        ]);
+
+        $user = Auth::user();
+
+        if ($request->hasFile('imagen')) {
+
+            // eliminar foto anterior si existe
+            if ($user->imagen && Storage::exists('public/'.$user->imagen)) {
+                Storage::delete('public/'.$user->imagen);
+            }
+
+            // guardar nueva foto
+            $ruta = $request->file('imagen')->store('perfil', 'public');
+
+            $user->imagen = $ruta;
+            $user->save();
+        }
+
+        return back()->with('success','Foto de perfil actualizada');
+    }
+    public function cambiarRol(Request $request, $id)
+    {
+        // Solo admin puede cambiar roles
+        if (Auth::user()->role_id != 1) {
+            abort(403);
+        }
+
+        $request->validate([
+            'role_id' => 'required|in:1,2,3'
+        ]);
+
+        $user = User::findOrFail($id);
+
+        $user->role_id = $request->role_id;
+        $user->save();
+
+        return back()->with('success', 'Rol actualizado correctamente');
+    }
+
 }

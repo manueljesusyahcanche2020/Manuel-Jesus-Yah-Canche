@@ -4,7 +4,7 @@
 <div class="container-fluid">
 
     <h4 class="mb-4 d-flex align-items-center gap-2" style="color:#ff9900;">
-        <i class="fa-solid fa-chart-column"></i> Ventas
+        <i class="fa-solid fa-chart-column"></i> Mis Ventas Completadas
     </h4>
 
     <!-- ====== GRÁFICAS ====== -->
@@ -28,15 +28,36 @@
 
     </div>
 
-    <!-- ====== TABLA ====== -->
+    <!-- ====== GRÁFICAS ADICIONALES ====== -->
+    <div class="row mb-4">
+
+        <!-- Ventas por Categoría -->
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm border-0 rounded-4 p-3">
+                <h6 class="fw-bold mb-3">Ventas por Categoría</h6>
+                <canvas id="ventasCategoria" height="120"></canvas>
+            </div>
+        </div>
+
+        <!-- Clientes Top -->
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm border-0 rounded-4 p-3">
+                <h6 class="fw-bold mb-3">Clientes Top</h6>
+                <canvas id="clientesTop" height="120"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====== TABLA DETALLE DE VENTAS ====== -->
     <div class="card shadow-sm border-0 rounded-4 p-3">
-        <h6 class="fw-bold mb-3">Detalle de Ventas</h6>
+        <h6 class="fw-bold mb-3">Detalle de Ventas Completadas</h6>
 
         <div class="table-responsive">
             <table id="tablaVentas" class="table table-striped align-middle">
                 <thead class="table-dark">
                     <tr>
-                        <th>ID</th>
+                        <th>Cliente</th>
                         <th>Producto</th>
                         <th>Categoría</th>
                         <th>Cantidad</th>
@@ -45,23 +66,16 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Ejemplo estático -->
+                    @foreach($ventas as $item)
                     <tr>
-                        <td>1</td>
-                        <td>Taco al Pastor</td>
-                        <td>Comida</td>
-                        <td>5</td>
-                        <td>$250.00</td>
-                        <td>15/12/2025</td>
+                        <td>{{ $item->pedido->user->name ?? 'Usuario eliminado' }}</td>
+                        <td>{{ $item->menu->nombre ?? 'Producto eliminado' }}</td>
+                        <td>{{ $item->menu->categoria->nombre ?? '-' }}</td>
+                        <td>{{ $item->cantidad }}</td>
+                        <td>${{ number_format($item->subtotal,2) }}</td>
+                        <td>{{ $item->created_at->format('d/m/Y') }}</td>
                     </tr>
-                    <tr>
-                        <td>2</td>
-                        <td>Hamburguesa</td>
-                        <td>Comida</td>
-                        <td>3</td>
-                        <td>$180.00</td>
-                        <td>16/12/2025</td>
-                    </tr>
+                    @endforeach
                 </tbody>
             </table>
         </div>
@@ -76,81 +90,93 @@
 <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
 
 <script>
-/* ====== PALETA OFICIAL ====== */
 const colores = {
     amarillo: '#ffcc00',
-    amarilloOscuro: '#ff9900',
+    naranja: '#ff9900',
     grisTexto: '#333',
     grisLinea: '#ddd'
 };
 
-/* ====== CHART 1: Ventas por mes ====== */
+/* ====== CHART 1: Ventas por Mes ====== */
 new Chart(document.getElementById('ventasMes'), {
     type: 'line',
     data: {
-        labels: ['Ene','Feb','Mar','Abr','May'],
+        labels: @json(array_keys($ventasPorMes->toArray())),
         datasets: [{
             label: 'Ventas',
-            data: [1200,1500,900,1800,2000],
-            borderColor: colores.amarilloOscuro,
+            data: @json(array_values($ventasPorMes->toArray())),
+            borderColor: colores.naranja,
             backgroundColor: 'rgba(255,204,0,0.25)',
             pointBackgroundColor: colores.amarillo,
-            pointBorderColor: colores.amarilloOscuro,
+            pointBorderColor: colores.naranja,
             borderWidth: 3,
             tension: 0.4,
             fill: true
         }]
     },
     options: {
-        plugins: {
-            legend: {
-                labels: { color: colores.grisTexto }
-            }
-        },
+        plugins: { legend: { labels: { color: colores.grisTexto } } },
         scales: {
-            x: {
-                ticks: { color: colores.grisTexto },
-                grid: { display: false }
-            },
-            y: {
-                ticks: { color: colores.grisTexto },
-                grid: { color: colores.grisLinea }
-            }
+            x: { ticks: { color: colores.grisTexto }, grid: { display: false } },
+            y: { ticks: { color: colores.grisTexto }, grid: { color: colores.grisLinea } }
         }
     }
 });
 
-/* ====== CHART 2: Productos más vendidos ====== */
+/* ====== CHART 2: Productos Top ====== */
 new Chart(document.getElementById('productosTop'), {
     type: 'bar',
     data: {
-        labels: ['Tacos','Hamburguesa','Pizza'],
+        labels: @json(array_keys($productosTop->toArray())),
         datasets: [{
             label: 'Cantidad vendida',
-            data: [40,25,15],
-            backgroundColor: [
-                colores.amarillo,
-                colores.amarilloOscuro,
-                '#ffe680'
-            ],
+            data: @json(array_values($productosTop->toArray())),
+            backgroundColor: [colores.amarillo, colores.naranja, '#ffe680', '#ffd633', '#ffbb00'],
             borderRadius: 6
         }]
     },
     options: {
-        plugins: {
-            legend: {
-                labels: { color: colores.grisTexto }
-            }
-        },
+        plugins: { legend: { labels: { color: colores.grisTexto } } },
         scales: {
-            x: {
-                ticks: { color: colores.grisTexto },
-                grid: { display: false }
-            },
-            y: {
-                ticks: { color: colores.grisTexto },
-                grid: { color: colores.grisLinea }
-            }
+            x: { ticks: { color: colores.grisTexto }, grid: { display: false } },
+            y: { ticks: { color: colores.grisTexto }, grid: { color: colores.grisLinea } }
+        }
+    }
+});
+
+/* ====== CHART 3: Ventas por Categoría ====== */
+new Chart(document.getElementById('ventasCategoria'), {
+    type: 'doughnut',
+    data: {
+        labels: @json(array_keys($ventasPorCategoria->toArray())),
+        datasets: [{
+            data: @json(array_values($ventasPorCategoria->toArray())),
+            backgroundColor: ['#ffcc00','#ff9900','#ffe680','#ffd633','#ffbb00','#ffdd99'],
+            borderWidth: 1
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: colores.grisTexto } } }
+    }
+});
+
+/* ====== CHART 4: Clientes Top ====== */
+new Chart(document.getElementById('clientesTop'), {
+    type: 'bar',
+    data: {
+        labels: @json(array_keys($clientesTop->toArray())),
+        datasets: [{
+            label: 'Total Comprado',
+            data: @json(array_values($clientesTop->toArray())),
+            backgroundColor: [colores.amarillo, colores.naranja, '#ffe680', '#ffd633', '#ffbb00'],
+            borderRadius: 6
+        }]
+    },
+    options: {
+        plugins: { legend: { labels: { color: colores.grisTexto } } },
+        scales: {
+            x: { ticks: { color: colores.grisTexto }, grid: { display: false } },
+            y: { ticks: { color: colores.grisTexto }, grid: { color: colores.grisLinea } }
         }
     }
 });

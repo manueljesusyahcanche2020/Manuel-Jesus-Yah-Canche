@@ -1,130 +1,84 @@
 <?php
 
 namespace App\Http\Controllers\administrador;
-use App\Http\Controllers\Controller; 
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
-use Illuminate\Support\Facades\DB;
 
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class BackupController extends Controller
 {
-    /**
-     * Muestra la vista del respaldo
-     */
     public function index()
     {
         return view('dashboard.administrador.respaldo');
     }
 
     /**
-     * Genera el respaldo de la base de datos
+     * RESPALDAR TABLAS + DATOS
      */
     public function create()
     {
-        $dbHost = env('DB_HOST', '127.0.0.1');
         $dbName = env('DB_DATABASE');
-        $dbUser = env('DB_USERNAME');
-        $dbPass = env('DB_PASSWORD');
-
         $fecha = now()->format('Y-m-d_H-i-s');
-        $fileName = "backup_{$dbName}_{$fecha}.sql";
-        $backupPath = storage_path("app/{$fileName}");
+        $fileName = "backup_tables_{$dbName}_{$fecha}.sql";
 
-        $mysqldump = 'C:\\xampp\\mysql\\bin\\mysqldump.exe';
+        $sql = "-- Backup de tablas\n";
+        $sql .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
 
-        $command = "\"$mysqldump\" -h {$dbHost} -u {$dbUser}";
-        if ($dbPass) {
-            $command .= " -p{$dbPass}";
+        $tables = DB::select('SHOW TABLES');
+
+        $key = "Tables_in_{$dbName}";
+
+        foreach ($tables as $tableObj) {
+            $table = $tableObj->$key;
+
+            // Estructura
+            $create = DB::select("SHOW CREATE TABLE `$table`")[0]->{'Create Table'};
+            $sql .= "DROP TABLE IF EXISTS `$table`;\n";
+            $sql .= $create . ";\n\n";
+
+            // Datos
+            $rows = DB::table($table)->get();
+
+            foreach ($rows as $row) {
+                $values = array_map(function ($value) {
+                    return is_null($value)
+                        ? 'NULL'
+                        : "'" . addslashes($value) . "'";
+                }, (array)$row);
+
+                $sql .= "INSERT INTO `$table` VALUES (" . implode(',', $values) . ");\n";
+            }
+
+            $sql .= "\n";
         }
 
-        // 🔥 Dump completo con BD incluida
-        $command .= " --databases {$dbName} --single-transaction --routines --triggers --add-drop-database > \"{$backupPath}\"";
+        $sql .= "SET FOREIGN_KEY_CHECKS=1;\n";
 
-        exec($command . " 2>&1", $output, $result);
+        Storage::disk('local')->put($fileName, $sql);
 
-        if ($result !== 0 || !file_exists($backupPath)) {
-            return back()->with('error', implode("\n", $output));
-        }
-
-        return response()->download($backupPath)->deleteFileAfterSend(true);
+        return response()->download(
+            storage_path("app/{$fileName}")
+        )->deleteFileAfterSend(true);
     }
 
     /**
-     * Restaura la base de datos
+     * RESTAURAR TABLAS + DATOS
      */
-
-   public function restore(Request $request)
+    public function restore(Request $request)
     {
         set_time_limit(0);
 
         $request->validate([
-            // Cambiamos mimes por extension para evitar errores de deteccion
             'sql_file' => 'required|file'
         ]);
 
-        $file = $request->file('sql_file');
-        $fullPath = $file->getRealPath();
+        $sql = file_get_contents($request->file('sql_file')->getRealPath());
 
-        // Configuración de conexión
-        $dbHost = env('DB_HOST', '127.0.0.1');
-        $dbName = env('DB_DATABASE');
-        $dbUser = env('DB_USERNAME');
-        $dbPass = env('DB_PASSWORD');
+        DB::unprepared($sql);
 
-        // Ruta al ejecutable de mysql (Asegúrate que sea la correcta en tu XAMPP)
-        $mysqlPath = 'C:\\xampp\\mysql\\bin\\mysql.exe';
-
-        // Construcción del comando
-        // Usamos --force para que continúe si hay errores menores
-        $command = "\"$mysqlPath\" -h {$dbHost} -u {$dbUser}";
-        
-        if ($dbPass) {
-            $command .= " -p{$dbPass}";
-        }
-
-        $command .= " {$dbName} < \"{$fullPath}\"";
-
-        // Ejecutar el comando
-        exec($command . " 2>&1", $output, $result);
-
-        if ($result !== 0) {
-            return back()->with('error', 'Error al restaurar: ' . implode("\n", $output));
-        }
-
-        return back()->with('success', '¡Base de datos restaurada con éxito!');
-    }
-    public function config(Request $request)
-    {
-    $request->validate([
-        'frecuencia' => 'required|in:daily,weekly,monthly',
-        'hora' => 'required'
-    ]);
-
-    DB::table('backup_settings')->updateOrInsert(
-        ['id' => 1],
-        [
-            'frecuencia' => $request->frecuencia,
-            'hora' => $request->hora,
-            'activo' => 1,
-            'updated_at' => now()
-        ]
-    );
-
-    // Calcular próximo respaldo
-    $next = now()->setTimeFromTimeString($request->hora);
-
-    if ($request->frecuencia === 'daily') {
-        $next->addDay();
-    } elseif ($request->frecuencia === 'weekly') {
-        $next->addWeek();
-    } else {
-        $next->addMonth();
-    }
-
-    return back()->with(
-        'next_backup',
-        $next->format('d/m/Y H:i')
-    );
+        return back()->with('success', '✅ Base de datos restaurada correctamente');
     }
 }

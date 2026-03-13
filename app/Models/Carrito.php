@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Carrito extends Model
 {
-    protected $fillable = ['user_id', 'estado', 'total'];
+    protected $fillable = ['user_id','vendedor_id', 'estado', 'total'];
 
     public function items()
     {
@@ -16,6 +16,10 @@ class Carrito extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+        public function vendedor()
+    {
+        return $this->belongsTo(User::class, 'vendedor_id');
     }
 }
 
